@@ -100,10 +100,7 @@ public class BomImportService {
         report.setGitlabGroupId(gitlabGroupId);
         report.setImportedBy(importedBy);
 
-        // Preserve every line break and indentation. Downloads are encoded as UTF-8.
-        String downloadXml = rawXml.replaceFirst(
-                "(?s)^(<\\?xml\\s+[^?]*?encoding\\s*=\\s*)[\"'][^\"']+[\"']", "$1\"UTF-8\"");
-        report.setRawXmlContent(downloadXml);
+        // Persist the original upload without decoding, reformatting or changing its BOM.
         report.setRawXmlBytes(bytes);
         report.setSerialNumber(dto.getSerialNumber());
 

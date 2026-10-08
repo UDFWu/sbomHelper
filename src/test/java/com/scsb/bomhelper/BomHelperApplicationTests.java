@@ -144,7 +144,7 @@ class BomHelperApplicationTests {
         String url = "/api/v1/bom/reports/" + report.getId() + "/download";
         mvc.perform(get(url).with(user(new LocalUserPrincipal("security", "0170"))))
                 .andExpect(status().isOk()).andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("filename*=UTF-8''project-scan-report.xml")))
-                .andExpect(content().bytes(report.getRawXmlContent().getBytes(StandardCharsets.UTF_8)));
+                .andExpect(content().bytes(report.getRawXmlBytes()));
         mvc.perform(get(url).with(user(developer("group")))).andExpect(status().isOk());
         mvc.perform(get(url).with(user(developer("other")))).andExpect(status().isNotFound());
         mvc.perform(get(url)).andExpect(status().is3xxRedirection());
@@ -215,12 +215,33 @@ class BomHelperApplicationTests {
         String payload = xml("unicode", "project", "中文套件").replace("</bom>", "<custom>完整報告</custom></bom>");
         byte[] bytes = ("<?xml version=\"1.0\" encoding=\"UTF-16\"?>" + payload).getBytes(StandardCharsets.UTF_16);
         imports.importSbom(new MockMultipartFile("file", "unicode.xml", "application/xml", bytes), "group", "tester");
-        assertThat(reports.findByScanId("unicode").orElseThrow().getRawXmlContent()).isEqualTo("<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + payload);
+        assertThat(reports.findByScanId("unicode").orElseThrow().getRawXmlBytes()).isEqualTo(bytes);
         var report = reports.findByScanId("unicode").orElseThrow();
         mvc.perform(get("/api/v1/bom/reports/" + report.getId() + "/download")
                 .with(user(new LocalUserPrincipal("security", "0170"))))
                 .andExpect(content().bytes(bytes));
     }
+    @Test void originalEncodingBomAndWhitespaceSurviveDatabaseAndDownload() throws Exception {
+        for (String encoding : List.of("UTF-8", "UTF-16LE", "UTF-16BE", "Big5")) {
+            for (boolean bom : List.of(false, true)) {
+                if (bom && encoding.equals("Big5")) continue;
+                String payload = "<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>\r\n"
+                        + "<!-- 原始報告 -->\r\n"
+                        + xml("encoding", "project", "中文套件").replace("\n", "\r\n")
+                        + "  \t\r\n";
+                byte[] original = ((bom ? "\uFEFF" : "") + payload)
+                        .getBytes(java.nio.charset.Charset.forName(encoding));
+                imports.importSbom(new MockMultipartFile("file", "original.xml", "application/xml", original),
+                        "group", "tester");
+                var report = reports.findByScanId("encoding").orElseThrow();
+                assertThat(report.getRawXmlBytes()).isEqualTo(original);
+                mvc.perform(get("/api/v1/bom/reports/" + report.getId() + "/download")
+                        .with(user(new LocalUserPrincipal("security", "0170"))))
+                        .andExpect(status().isOk()).andExpect(content().bytes(original));
+            }
+        }
+    }
+
     @Test void downloadPreservesUploadedLineEndingsAndIndentation() throws Exception {
         for (String newline : List.of("\n", "\r\n", "\r")) {
             String payload = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + newline
@@ -251,15 +272,14 @@ class BomHelperApplicationTests {
                 .isEqualTo("CFMS Project-scan-report.xml");
     }
 
-    @Test void legacyTextDownloadStillWorksUntilOriginalIsUploadedAgain() throws Exception {
+    @Test void reportWithoutOriginalBytesCannotBeDownloaded() throws Exception {
         upload("legacy", "group", "project");
         var report = reports.findAll().get(0);
         report.setRawXmlBytes(null);
         reports.saveAndFlush(report);
         mvc.perform(get("/api/v1/bom/reports/" + report.getId() + "/download")
                 .with(user(new LocalUserPrincipal("security", "0170"))))
-                .andExpect(status().isOk())
-                .andExpect(content().bytes(report.getRawXmlContent().getBytes(StandardCharsets.UTF_8)));
+                .andExpect(status().isNotFound());
     }
 
     @Test void adminUpdatesStatusWithoutChangingOtherAccountFields() throws Exception {

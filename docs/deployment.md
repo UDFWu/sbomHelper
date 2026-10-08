@@ -78,20 +78,22 @@ java -cp $bomClasspath com.scsb.bomhelper.util.LocalPasswordCli
 
 ## 查詢與下載
 
-本次部署須先執行 007，避免舊 XML 欄位在新程式上傳時繼續改寫空白或拒絕 encoding 宣告。
+本次依 D:\codexData\sbomHelper\DB.sql 現有架構部署：備份 BOMSDB 並停止上傳，執行 [009_drop_raw_xml_content.sql](../sql/009_drop_raw_xml_content.sql)，再部署新版程式。
 
 兩種查詢結果皆新增「下載報告」，端點為 `GET /api/v1/bom/reports/{id}/download`。
 伺服器重新檢核權限，以 XML attachment 傳回原始 `RawXmlBytes`（不重新排版、不轉換編碼）；
 未授權或報告不存在回傳 404，未登入由 Spring Security 導向登入。
 檔名為 `<GitLab Project Name>-scan-report.xml`，優先使用 GitLab API 的專案顯示名稱，API 不可用時回退至資料庫專案代號的最後一段。
 檔名會替換不合法字元，並支援 UTF-8 中文名稱。
-部署前執行 [007_preserve_report_xml_format.sql](../sql/007_preserve_report_xml_format.sql)，
-將 RawXmlContent 由 XML 轉為 nvarchar(max)；此步驟對新建與既有 DB 都適用。
-請先備份並於維護時段執行；轉換在同一交易中完成，保留現有內容，不可還原已被 XML 型別移除的換行。
-另須先執行 [008_preserve_original_report_bytes.sql](../sql/008_preserve_original_report_bytes.sql)，新增 `RawXmlBytes varbinary(max)`。
-新上傳直接保存檔案位元組，下載與原檔逐位元組相同，包括 LF／CRLF／CR、縮排、空白、BOM 與編碼宣告。
-既有資料沒有 `RawXmlBytes` 時沿用 UTF-8 文字下載；需要重新上傳原檔才能恢復已遺失的格式。
-回歸測試以 `cfms-bom.xml` 實際匯入、DB 讀回再下載，比對完整位元組內容。
+`RawXmlBytes varbinary(max)` 是唯一的原始檔儲存欄位；009 在交易中刪除 `RawXmlContent`，可重複執行。
+依使用者允許刪除目前資料的指示，009 會刪除 RawXmlBytes 為 NULL 或空位元組的報告，並透過 DB.sql 的 ON DELETE CASCADE 刪除其元件、相依關係與漏洞明細；已有原始位元組的報告保留。
+清理與刪除欄位在同一交易中完成，任一步驟失敗會回復；成功時回傳 DeletedReports 刪除筆數。
+不將舊文字轉成位元組冒充原檔，因為無法還原已遺失的原始編碼、BOM 或空白。
+新上傳直接保存 MultipartFile 的完整位元組，下載不經文字轉換，包含 LF／CRLF／CR、縮排、空白、BOM 與編碼宣告。
+未保存原始位元組的報告下載回傳 404，需重新上傳原檔。
+此腳本尚未對實際 SQL Server 執行。
+本次回歸測試以 UTF-8、UTF-16（含 LE／BE）、Big5，含／不含 BOM、中文、註解、尾端空白及不同換行進行匯入、H2 DB 讀回與下載，逐位元組比對。
+2026-10-08：33 項測試中 31 項通過；其餘 2 項因原專案缺少 cfms-bom.xml 與 sql/004_bootstrap_admin.sql 發生錯誤。
 
 設定伺服器環境變數 `GITLAB_ADMIN_TOKEN` 為管理者 Personal Access Token（需可讀取 API），不要將 token 寫入版本控制。
 未設定 token 時，仍支援 `gitlab.admin-username`／`gitlab.admin-password` 管理者帳密設定。

@@ -8,8 +8,7 @@
 .\scripts\build-local.ps1
 ```
 
-腳本將 Maven 相依套件存放於 `D:\.m2`，Maven Wrapper 本身的下載檔放於
-`D:\.m2\wrapper`。使用已安裝的 Maven 時：
+腳本將 Maven 相依套件存放於 `D:\.m2`，預設使用已安裝的 Maven 與 JDK 17。使用其他 Maven 時：
 
 ```powershell
 .\scripts\build-local.ps1 -MavenCommand 'D:\idea\plugins\maven\lib\maven3\bin\mvn.cmd'
@@ -45,3 +44,9 @@ IntelliJ IDEA 可將 Maven 的 Local repository 設為 `D:\.m2`。
 外掛安裝另有 `~/.codex/plugins/cache`，其中包含目前執行中的外掛檔案，
 不能在使用中直接移走；官方並未在上述文件保證一個單獨的「所有桌面快取路徑」設定。
 來源：[官方外掛快取位置](https://developers.openai.com/plugins/build/plugins#how-local-marketplaces-work)。
+
+## 專案 DB 與任務資料：D:\codexData\sbomHelper
+
+原始 DB.sql 保留不變；DB.updated.sql 為移除 RawXmlContent 的完整建表版本，供新建資料庫使用。
+既有資料庫使用 sql\009_drop_raw_xml_content.sql，不要執行完整建表版本。
+SQL 腳本亦保存在專案 sql 目錄供版本控制；Maven 套件沿用 D:\.m2。

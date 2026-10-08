@@ -117,11 +117,7 @@ public class BomController {
             return ResponseEntity.notFound().build();
         }
         byte[] xmlBytes = report.getRawXmlBytes();
-        boolean originalUpload = xmlBytes != null;
-        if (!originalUpload) {
-            if (report.getRawXmlContent() == null) return ResponseEntity.notFound().build();
-            xmlBytes = report.getRawXmlContent().getBytes(StandardCharsets.UTF_8);
-        }
+        if (xmlBytes == null) return ResponseEntity.notFound().build();
         String projectName = gitLabService.fetchProjectNameAsAdmin(report.getGitlabGroupId(), report.getGitlabProjectId());
         if (projectName == null || projectName.isBlank()) {
             projectName = report.getGitlabProjectId();
@@ -129,8 +125,7 @@ public class BomController {
         }
         String filename = projectName.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_").strip() + "-scan-report.xml";
         return ResponseEntity.ok()
-                .contentType(originalUpload ? MediaType.APPLICATION_XML
-                        : new MediaType("application", "xml", StandardCharsets.UTF_8))
+                .contentType(MediaType.APPLICATION_XML)
                 .header("Content-Disposition", ContentDisposition.attachment()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
                 .header("Cache-Control", "no-store")

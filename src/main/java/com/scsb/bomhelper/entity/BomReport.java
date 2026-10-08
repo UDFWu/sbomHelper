@@ -31,9 +31,6 @@ public class BomReport {
     @Column(name = "Timestamp")
     private Date timestamp;
 
-    @Column(name = "RawXmlContent", length = Integer.MAX_VALUE)
-    private String rawXmlContent;
-
     // Store the upload itself so XML parsers and DB XML types cannot normalize whitespace.
     @Column(name = "RawXmlBytes", length = Integer.MAX_VALUE)
     private byte[] rawXmlBytes;
@@ -118,9 +115,6 @@ public class BomReport {
 
     public Date getTimestamp() { return timestamp; }
     public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
-
-    public String getRawXmlContent() { return rawXmlContent; }
-    public void setRawXmlContent(String rawXmlContent) { this.rawXmlContent = rawXmlContent; }
 
     public String getImportedBy() { return importedBy; }
     public void setImportedBy(String importedBy) { this.importedBy = importedBy; }
